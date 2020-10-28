@@ -7,16 +7,28 @@ from textblob import TextBlob
 import threading
 from random_tweets import random_tweets
 from environment import oauth_keys
+from datetime import datetime
 
-popular_accounts = ['BTW_twt', 'ygofficialblink', 'JYPETWICE']
-random_tweet_search_terms = ["#MJ+GOAT", "#DBZ", "SSBU", "Super Smash Bros", "Anime", "Video Games", "BTS"]
+
+blacklisted_terms = ['nigger', 'retard', 'faggot', 'chink', 'gook', 'kike', 'jew']
+popular_accounts = ['BTS_twt', 'ygofficialblink', 'JYPETWICE']
+random_tweet_search_terms = ["#MJ+GOAT", "#DBZ", "SSBU", "Super Smash Bros", "Anime", "Video Games", "BTS", "#Twice", "#blackpink", "#Lakers", "#naruto", '#tsundere', "#realmadrid", "#kobe"]
 default_accounts = ['kanyewest', 'elonmusk', 'barackobama', 'aoc', 'jk_rowling', 'KDTrey5', 'ArianaGrande', 'KimKardashian', 'realmadrid', 'wizkhalifa', 'KevinHart4real', 'akshaykumar', 'BeingSalmanKhan', 'SrBachchan', 'MileyCyrus', 'BTW_twt', 'ygofficialblink', 'JYPETWICE']
-keywords = ['Lebron', 'MJ', 'stans', 'Kobe', 'GOAT', 'Pippen', 'Wade', 'Kyrie', "LBJ", "Bron", "Jordan", '"']
+keywords = ['Lebron', 'MJ', 'stans', 'Kobe', 'GOAT', 'Pippen', 'Wade', 'Kyrie', "LBJ", "Bron", "Jordan", 'Wilt', 'L']
 reply_phrases_positive = ['facts on facts', 'w', 'EXACTLY!!!!!', 'MJ is the GOAT!!', "couldn't agree more", 'YESSSSS', 'Absolutely', 'No lies here', 'FACTS!!!!', 'Yep', 'KOBE IS THE GOAT!', ' Kobe > Lebron']
-reply_phrases_negative = ['L', 'lmao bronstan logic', 'dumb', 'Bronsexuals brah', 'this is the dumbest tweet ever', 'Lol you know nothing', 'Worst take ever', 'lmao this si the stupideest thing i ever read', 'do you even watch basketball??']
+reply_phrases_negative = ['L', 'lmao bronstan logic', 'dumb', 'Bronsexuals brah', 'this is the dumbest tweet ever', 'Lol you know nothing', 'Worst take ever', 'lmao this si the stupideest thing i ever read', 'do you even watch basketball??', 'You legit got no braincells smh']
+general_questions = ['wyd', 'what it do babyyyyyyyy?', 'Where can I find the strongest pokemon?', 'Will you be my girlfriend?', 'Why?', 'Are you the one?', 'sup']
+general_responses = ['ok', 'lol', 'hmmmmm', 'i think i love you', 'i want hamburgers', "that ain't right", 'definitely sus haha', 'lmao wut']
+image_dict = {
+    0: 'clown.jpg',
+    1: 'drooling_wojak_friends.png',
+    2: 'drooling_wojak.png',
+    3: 'bronsexuals.jpg'
+}
+
 
 def like(api, nfc_account):
-    print('liking netorarefanclub tweets -------------')
+    print('liking netorarefanclub tweets -------------', get_current_time())
     for tweet in tweepy.Cursor(api.user_timeline,id=nfc_account.id).items(10):
         print(tweet.text)
         try:
@@ -29,7 +41,7 @@ def like(api, nfc_account):
         time.sleep(5)
 
 def like_likes(api, nfc_account):
-    print('liking netorarefanclub likes -------------')
+    print('liking netorarefanclub likes -------------', get_current_time())
     for favorite in tweepy.Cursor(api.favorites, id=nfc_account.id).items(20):
         print('liking liked tweet...', favorite.text)
         try:
@@ -44,133 +56,108 @@ def like_likes(api, nfc_account):
 
 
 def reply_to_latest_comments(api, nfc_account):
-    print('replying to latest comments -------------')
+    print('replying to latest comments -------------', get_current_time())
     user_name = "@netorarefanclub"
     for tweet in tweepy.Cursor(api.user_timeline,id=nfc_account.id).items(5):
-        replies = tweepy.Cursor(api.search, q='to:{}'.format(user_name),
+        replies_iterator = tweepy.Cursor(api.search, q='to:{}'.format(user_name),
                                     since_id=tweet.id, tweet_mode='extended').items()
         screen_names = []
-        for reply in replies:
+        replies = []
+        for reply in replies_iterator:
             screen_names.append(reply.user.screen_name)
+            replies.append(reply)
         
         if api.me().screen_name in screen_names:
             print('HAVE ALREADY REPLIED TO THIS TWEET')
             continue
-        iterate_through_replies(replies, tweet, api, True)
+        reply_positive(tweet, api)
 
 def reply_to_commented_tweet(api, nfc_account):
-    print('replying to commented tweets -------------')
+    print('replying to commented tweets -------------', get_current_time())
     for tweet in tweepy.Cursor(api.user_timeline,id=nfc_account.id).items(5):
-        random = randrange(2)
 
-        # 33% chance to reply to commented tweet
-        if random == 1:
-            replies = tweepy.Cursor(api.search, q='to:{}'.format(tweet.in_reply_to_screen_name),
-                                    since_id=tweet.in_reply_to_status_id, tweet_mode='extended').items()
-            
-            screen_names = []
-            for reply in replies:
-                screen_names.append(reply.user.screen_name)
-            
-            if api.me().screen_name in screen_names:
-                print('HAVE ALREADY REPLIED TO THIS COMMENTED TWEET')
-                continue
-                
-            try: 
-                tweet = api.get_status(tweet.in_reply_to_status_id)
-                iterate_through_replies(replies, tweet, api, False)
-            except tweepy.TweepError as e:
-                print(e.reason)
-                time.sleep(600)
-
-    
-
-def iterate_through_replies(replies, tweet, api, is_positive=True):
-    while True:
-        try:
-            reply = replies.next()
-            if not hasattr(reply, 'in_reply_to_status_id_str'):
-                continue
-            if reply.in_reply_to_status_id == tweet.id:
-                if reply.user.screen_name == api.me().screen_name:
-                    print('Already replied to this tweet...')
-                    break
-                elif is_positive:
-                    reply_positive(tweet, api)
-                else:
-                    reply_negative(tweet, api)
-
-        except tweepy.RateLimitError as e:
-            print("Twitter api rate limit reached")
-            time.sleep(60)
+        replies_iterator = tweepy.Cursor(api.search, q='to:{}'.format(tweet.in_reply_to_screen_name),
+                                since_id=tweet.in_reply_to_status_id, tweet_mode='extended').items()
+        
+        screen_names = []
+        for reply in replies_iterator:
+            screen_names.append(reply.user.screen_name)
+        
+        if api.me().screen_name in screen_names:
+            print('HAVE ALREADY REPLIED TO THIS COMMENTED TWEET')
             continue
+            
+        try: 
+            original_tweet = api.get_status(tweet.in_reply_to_status_id)
 
+            reply_negative(original_tweet, tweet, api)
         except tweepy.TweepError as e:
-            print("Tweepy error occured:{}".format(e))
-            break
+            print(e.reason)
+            time.sleep(600)
 
-        except StopIteration:
-            break
+def reply_to_replies(api):
+    for tweet in tweepy.Cursor(api.user_timeline,id=api.me().id).items(20):
+        print(tweet.text)
 
-        except Exception as e:
-            print("Failed while fetching replies {}".format(e))
-            break
 
 def reply_positive(tweet, api):
+    print('replying positive----------------', get_current_time())
+    print('tweet: ', tweet.text)
     has_keywords = re.findall(r"(?=("+'|'.join(keywords)+r"))",tweet.text)
-
     # If there is a match in related content we reply
     if len(has_keywords) > 0:
-        print('comment', tweet.text)
-        print('replying with ', api.me().id)
+        print('******HAS KEYWORDS******')
         random_idx = randrange(len(reply_phrases_positive))
         random_positive_response = reply_phrases_positive[random_idx]
         random = randrange(10)
         if random == 10 or random == 9:
             try:
                 api.update_with_media('dropped_this_king.jpg', in_reply_to_status_id=tweet.id, auto_populate_reply_metadata=True)
-                print('replying with image: ', 'dropped_this_king.jpg')
+                print('replying positively with image: ', 'dropped_this_king.jpg')
                 time.sleep(600)
             except tweepy.TweepError as e:
                 print(e.reason)
                 time.sleep(600)
         else:
             api.update_status(random_positive_response, in_reply_to_status_id=tweet.id, auto_populate_reply_metadata=True)
-            print('replying with text: ', random_positive_response)
+            print('replying positively with text: ', random_positive_response)
             time.sleep(600)
 
-def reply_negative(tweet, api):
+def reply_negative(original_tweet, tweet, api):
+    print('replying negative----------------', get_current_time())
+    print('original_tweet: ', original_tweet.text)
+    print('my_tweet: ', tweet.text)
+    original_has_keywords = re.findall(r"(?=("+'|'.join(keywords)+r"))",original_tweet.text)
     has_keywords = re.findall(r"(?=("+'|'.join(keywords)+r"))",tweet.text)
 
     # If there is a match in related content we reply
-    if len(has_keywords) > 0:
-        print('comment', tweet.text)
-        print('replying with ', api.me().id)
+    if len(has_keywords) > 0 or len(original_has_keywords) > 0:
+        print('******HAS KEYWORDS******')
         random_idx = randrange(len(reply_phrases_negative))
         random_negative_response = reply_phrases_negative[random_idx]
         random = randrange(5)
         # 2/5 chance to post image
         if random == 5 or random == 2:
             try: 
-                rd_img = randrange(1)
-                img = 'drooling_wojak.png' if rd_img == 1 else 'drooling_wojak_friends.png'
-                api.update_with_media(img, in_reply_to_status_id=tweet.id, auto_populate_reply_metadata=True, status=random_negative_response)
-                print('replying with image: ', img)
+                rd_img = randrange(3)
+                img = image_dict[rd_img]
+                api.update_with_media(img, in_reply_to_status_id=original_tweet.id, auto_populate_reply_metadata=True, status=random_negative_response)
+                print('replying negatively with image: ', img)
                 time.sleep(600)
             except tweepy.TweepError as e:
                 print(e.reason)
                 time.sleep(600)
         else:
             try:
-                api.update_status(random_negative_response, in_reply_to_status_id=tweet.id, auto_populate_reply_metadata=True)
-                print('replying with text: ', random_negative_response)
+                api.update_status(random_negative_response, in_reply_to_status_id=original_tweet.id, auto_populate_reply_metadata=True)
+                print('replying negatively with text: ', random_negative_response)
                 time.sleep(600)
             except tweepy.TweepError as e:
                 print(e.reason)
                 time.sleep(600)
 
 def tweet_random_tweet(api):
-    print('running tweet_random_tweet -------------')
+    print('running tweet_random_tweet -------------', get_current_time())
     random_search_idx = randrange(len(random_tweet_search_terms))
     search_term = random_tweet_search_terms[random_search_idx]
     tweets = []
@@ -179,20 +166,22 @@ def tweet_random_tweet(api):
 
     random_tweet_idx = randrange(len(tweets))
     random_tweet = tweets[random_tweet_idx]
-    sentiment_object = TextBlob(random_tweet.text)
-    print(sentiment_object.polarity, sentiment_object)
-    print('tweeting random tweet:', random_tweet.text)
-    try:
-        api.update_status(random_tweet.text)
-        time.sleep(20)
-    except tweepy.TweepError as e:
-        print(e.reason)
-        time.sleep(20)
+    random_tweet_has_blacklisted_terms = re.findall(r"(?=("+'|'.join(blacklisted_terms)+r"))",random_tweet.text)
+    if not random_tweet_has_blacklisted_terms:
+        sentiment_object = TextBlob(random_tweet.text)
+        print(sentiment_object.polarity, sentiment_object)
+        print('tweeting random tweet:', random_tweet.text)
+        try:
+            api.update_status(random_tweet.text)
+            time.sleep(20)
+        except tweepy.TweepError as e:
+            print(e.reason)
+            time.sleep(20)
 
 
 
 def retweet_random_tweet(api):
-    print('running retweet_random_tweet -------------')
+    print('running retweet_random_tweet -------------', get_current_time())
     random_search_idx = randrange(len(random_tweet_search_terms))
     search_term = random_tweet_search_terms[random_search_idx]
     tweets = []
@@ -210,8 +199,7 @@ def retweet_random_tweet(api):
     except tweepy.TweepError as e:
         print(e.reason)
         time.sleep(20)
-    
-    print("Following person who I retweeted", random_tweet.user)
+    print("Following person who I retweeted", random_tweet.user) 
     try: 
         api.create_friendship(random_tweet.user.id)
         time.sleep(20)
@@ -220,7 +208,7 @@ def retweet_random_tweet(api):
         time.sleep(20)
     
 def retweet_popular_accounts(api):
-    print('running retweet_popular_accounts -------------')
+    print('running retweet_popular_accounts -------------', get_current_time())
     for name in popular_accounts:
         user = api.get_user(screen_name = name)
         for tweet in tweepy.Cursor(api.user_timeline,id=user.id).items(1):
@@ -307,6 +295,7 @@ def main():
             like_likes(api, nfc_account)
             reply_to_latest_comments(api, nfc_account)
             reply_to_commented_tweet(api, nfc_account)
+            reply_to_replies(api)
 
             # delete_all_tweets(api, nfc_account)
 
@@ -329,7 +318,17 @@ def run_tweet_from_accounts():
             retweet_random_tweet(api)
             retweet_popular_accounts(api)
 
-        time.sleep(7200)
+        time.sleep(1800)
+
+
+def get_current_time():
+    now = datetime.now()
+ 
+    print("now =", now)
+
+    # dd/mm/YY H:M:S
+    dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    return dt_string
 
 
 try:
